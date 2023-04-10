@@ -1,0 +1,3 @@
+[workspace]
+members = ["infoc_client"]
+
