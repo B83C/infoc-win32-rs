@@ -1,0 +1,13 @@
+[package]
+name = "infoc"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rkyv = { version = "0.7.41", features = ["copy_unsafe", "validation", "indexmap"] }
+serde = { version = "1.0.159", features = ["alloc", "derive", "unstable"] }
+strum = { version = "0.24.1", features = ["derive", "phf", "strum_macros"] }
+strum_macros = "0.24.3"
+wmi = "0.12.2"
