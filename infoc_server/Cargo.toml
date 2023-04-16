@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.27.0", features = ["full"] }
+clap = { version = "4.2.2", features = ["derive"] }
 infoc = { path = "../infoc" }
-redb = "0.15.0"
+microkv = "0.2.9"
+rust_xlsxwriter = { version = "0.34.0", features = ["zlib"] }

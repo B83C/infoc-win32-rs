@@ -1,40 +1,48 @@
 use infoc::*;
-use redb::*;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
-
-const TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("info");
+use infoc_server::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(CONNECTION_STR).await?;
+    use std::sync::Arc;
 
-    let db = Database::create("info.redb")?;
+    let db = microkv_open()?.set_auto_commit(true);
+
+    let db = Arc::new(db);
+
     loop {
-        let (mut socket, _) = listener.accept().await?;
+        let (socket, _) = listener.accept().await?;
+
+        let db = db.clone();
 
         tokio::spawn(async move {
-            let mut buf = [0; 8196 * 2];
+            let (read, write) = socket.into_split();
 
-            loop {
-                let n = match socket.read(&mut buf).await {
-                    Ok(n) if n == 0 => return,
-                    Ok(n) => n,
-                    Err(e) => {
-                        eprintln!("failed to read from socket; err = {:?}", e);
-                        return;
-                    }
-                };
+            let mut transport = LengthDelimitedCodec::builder()
+                .length_field_type::<u32>()
+                .new_read(read);
 
-                let buf = [MAGIC, &VERSION, "OK".as_bytes()].concat();
+            let msg = transport.next().await.unwrap().unwrap();
 
-                if let Err(e) = socket.try_write(&buf) {
-                    eprintln!("failed to write to socket; err = {:?}", e);
-                    return;
-                }
-            }
+            let header = unsafe { rkyv::archived_root::<Packet>(&msg[..]) };
+
+            dbg!(header);
+
+            let msg: Bytes = transport.next().await.unwrap().unwrap().into();
+
+            dbg!(&msg);
+
+            db.put(header.staffid.as_ref(), &msg.as_ref()).unwrap();
+
+            dbg!(db.keys().unwrap());
+
+            db.commit();
+
+            let mut transport = LengthDelimitedCodec::builder()
+                .length_field_type::<u32>()
+                .new_write(write);
+
+            transport.send(Bytes::from("OK")).await.unwrap();
         });
     }
-
-    Ok(())
 }

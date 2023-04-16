@@ -1,88 +1,122 @@
+pub use bytes::Bytes;
+pub use futures::{SinkExt, StreamExt};
 pub use rkyv;
 use rkyv::*;
 use serde::Deserialize;
 pub use strum::VariantNames;
 use strum_macros::*;
+pub use tokio;
+pub use tokio::net::*;
+pub use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 #[derive(Archive, Serialize, Deserialize, Debug, Default)]
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug))]
-#[serde(rename = "Win32_OperatingSystem")]
-#[serde(rename_all = "PascalCase")]
-pub struct OperatingSystem {
-    caption: String,
-}
-
-#[derive(Archive, Serialize, Deserialize, Debug, Default)]
-#[archive(check_bytes)]
-#[archive_attr(derive(Debug))]
-#[serde(rename = "Win32_ComputerSystem")]
-#[serde(rename_all = "PascalCase")]
-pub struct ComputerSystem {
-    name: String,
-    model: String,
-    manufacturer: String,
-    systemskunumber: String,
-    systemtype: String,
-    totalphysicalmemory: u64,
-    username: String,
-}
-
-#[derive(Archive, Serialize, Deserialize, Debug, Default)]
-#[archive(check_bytes)]
-#[archive_attr(derive(Debug))]
-#[serde(rename = "Win32_ComputerSystemProduct")]
-#[serde(rename_all = "PascalCase")]
-pub struct ComputerSystemProduct {
-    identifyingnumber: Option<String>,
-    name: String,
-    skunumber: Option<String>,
-    vendor: Option<String>,
-    version: Option<String>,
-}
-
-#[derive(Archive, Serialize, Deserialize, Debug, Default)]
-#[archive(check_bytes)]
-#[archive_attr(derive(Debug))]
-#[serde(rename = "Win32_DiskDrive")]
-#[serde(rename_all = "PascalCase")]
-pub struct DiskDrive {
-    caption: String,
-    size: u64,
-}
-
-#[derive(Archive, Serialize, Deserialize, Debug, Default)]
-#[archive(check_bytes)]
-#[archive_attr(derive(Debug))]
-#[serde(rename = "Win32_NetworkAdapterConfiguration")]
-#[serde(rename_all = "PascalCase")]
-pub struct NetworkAdapterConfiguration {
-    dnshostname: Option<String>,
-    ipaddress: Vec<String>,
-    dhcpserver: Option<String>,
-    macaddress: Option<String>,
-}
-
-#[derive(Archive, Serialize, Deserialize, Debug, Default)]
-#[archive(check_bytes)]
-#[archive_attr(derive(Debug))]
-#[serde(rename = "Win32_Processor")]
-#[serde(rename_all = "PascalCase")]
-pub struct Processor {
-    caption: String,
-    name: String,
-    manufacturer: String,
+pub enum DiskType {
+    SSD,
+    HDD,
+    #[default]
+    None,
 }
 
 #[derive(Archive, Serialize, Deserialize, Debug, Default)]
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug))]
 pub struct SysInfo {
-    os: OperatingSystem,
-    cs: ComputerSystem,
-    csp: ComputerSystemProduct,
-    nac: NetworkAdapterConfiguration,
+    pub cpu: String,
+    pub os: String,
+    pub disk_size: u64,
+    pub disk_type: DiskType,
+    pub memory_size: u64,
+    pub serial_number: String,
+    pub product_name: String,
+    pub manufacturer: String,
+    pub sku_number: String,
+    pub version: String,
+    pub uuid: String,
+    pub microsoft_office: Vec<String>,
+    pub physical_address: Vec<[u8; 6]>,
 }
+
+// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
+// #[archive(check_bytes)]
+// #[archive_attr(derive(Debug))]
+// #[serde(rename = "Win32_OperatingSystem")]
+// #[serde(rename_all = "PascalCase")]
+// pub struct OperatingSystem {
+//     caption: String,
+// }
+
+// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
+// #[archive(check_bytes)]
+// #[archive_attr(derive(Debug))]
+// #[serde(rename = "Win32_ComputerSystem")]
+// #[serde(rename_all = "PascalCase")]
+// pub struct ComputerSystem {
+//     name: String,
+//     model: String,
+//     manufacturer: String,
+//     systemskunumber: String,
+//     systemtype: String,
+//     totalphysicalmemory: u64,
+//     username: String,
+// }
+
+// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
+// #[archive(check_bytes)]
+// #[archive_attr(derive(Debug))]
+// #[serde(rename = "Win32_ComputerSystemProduct")]
+// #[serde(rename_all = "PascalCase")]
+// pub struct ComputerSystemProduct {
+//     identifyingnumber: Option<String>,
+//     name: String,
+//     skunumber: Option<String>,
+//     vendor: Option<String>,
+//     version: Option<String>,
+// }
+
+// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
+// #[archive(check_bytes)]
+// #[archive_attr(derive(Debug))]
+// #[serde(rename = "Win32_DiskDrive")]
+// #[serde(rename_all = "PascalCase")]
+// pub struct DiskDrive {
+//     caption: String,
+//     size: u64,
+// }
+
+// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
+// #[archive(check_bytes)]
+// #[archive_attr(derive(Debug))]
+// #[serde(rename = "Win32_NetworkAdapterConfiguration")]
+// #[serde(rename_all = "PascalCase")]
+// pub struct NetworkAdapterConfiguration {
+//     dnshostname: Option<String>,
+//     ipaddress: Vec<String>,
+//     dhcpserver: Option<String>,
+//     macaddress: Option<String>,
+// }
+
+// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
+// #[archive(check_bytes)]
+// #[archive_attr(derive(Debug))]
+// #[serde(rename = "Win32_Processor")]
+// #[serde(rename_all = "PascalCase")]
+// pub struct Processor {
+//     caption: String,
+//     name: String,
+//     manufacturer: String,
+// }
+
+// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
+// #[archive(check_bytes)]
+// #[archive_attr(derive(Debug))]
+// pub struct SysInfo {
+//     os: OperatingSystem,
+//     cs: ComputerSystem,
+//     csp: ComputerSystemProduct,
+//     nac: NetworkAdapterConfiguration,
+// }
 
 #[derive(Archive, Serialize, Deserialize, Default, Debug)]
 #[archive(check_bytes)]
@@ -124,7 +158,7 @@ pub struct Position {
 #[derive(Archive, Serialize, Deserialize, Default, Debug)]
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug))]
-pub struct Info {
+pub struct Infoc {
     pub accessories: Vec<Accessories>,
     pub pos: Position,
     pub sysinfo: SysInfo,
@@ -158,19 +192,27 @@ pub const DEPARTMENT: [&str; 25] = [
     "其他",
 ];
 
+#[derive(Archive, Deserialize, Serialize, Debug)]
+#[archive_attr(derive(Debug))]
+pub struct Packet {
+    pub magic: u32,
+    pub version: u16,
+    pub staffid: String,
+}
+
 #[cfg(debug_assertions)]
 pub const CONNECTION_STR: &str = "localhost:8989";
 
 #[cfg(not(debug_assertions))]
 pub const CONNECTION_STR: &str = "asset.chonghwakl.edu.my:8989";
 
-pub const MAGIC: &[u8] = b"CHKLINFO";
-pub const VERSION: [u8; 3] = [0, 1, 0];
+pub const MAGIC: u32 = u32::from_le_bytes([b'C', b'H', b'K', b'L']);
+pub const VERSION: u16 = 1;
 
-pub fn decode<'a>(bytes: &'a [u8]) -> &'a ArchivedInfo {
-    rkyv::check_archived_root::<Info>(bytes).unwrap()
+pub fn decode<'a>(bytes: &'a [u8]) -> &'a ArchivedInfoc {
+    rkyv::check_archived_root::<Infoc>(bytes).unwrap()
 }
 
-pub fn encode(info: &Info) -> AlignedVec {
-    rkyv::to_bytes::<_, 8192>(info).unwrap()
+pub fn encode(info: &Infoc) -> AlignedVec {
+    rkyv::to_bytes::<_, 16384>(info).unwrap()
 }
