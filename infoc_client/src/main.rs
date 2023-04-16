@@ -5,17 +5,18 @@ use std::error::Error;
 // use sysinfo::{Cpu, Disk, MacAddr, NetworkExt, NetworksExt, RefreshKind, System, SystemExt, User};
 // use wmi::WMIDateTime;
 // use wmi::{COMLibrary, WMIConnection};
-use ipconfig::*;
-use os_info::*;
-use smbioslib::*;
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::mem::size_of;
-use windows::{
+use ::windows::{
     core::*, Win32::Foundation::*, Win32::Storage::FileSystem::*, Win32::System::Ioctl::*,
     Win32::System::SystemInformation::*, Win32::System::WindowsProgramming::*,
     Win32::System::IO::*,
 };
+use core::ffi::c_void;
+use ipconfig::*;
+use smbioslib::*;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::mem::size_of;
+use std::result::Result;
 
 #[inline]
 fn prompt() -> Result<(String, Infoc), Box<dyn Error>> {
@@ -66,7 +67,7 @@ fn prompt() -> Result<(String, Infoc), Box<dyn Error>> {
 
     Ok((
         staffid,
-        Info {
+        Infoc {
             accessories,
             pos,
             sysinfo: Default::default(),
@@ -74,7 +75,8 @@ fn prompt() -> Result<(String, Infoc), Box<dyn Error>> {
     ))
 }
 
-fn get_sys_info() {
+fn get_sys_info() -> SysInfo {
+    let mut sysinfo: SysInfo = Default::default();
     let mut mounts = unsafe { GetLogicalDrives() };
     let mut accumulator = 0u8;
 
@@ -176,12 +178,9 @@ fn get_sys_info() {
             CloseHandle(handle);
         }
 
-        if !desc.IncursSeekPenalty.as_bool() {
-            println!("SSD");
-        } else {
-            println!("HDD");
-        }
-        println!("{}GB", dgeo.DiskSize.div_euclid(1000000000));
+        let type = if !desc.IncursSeekPenalty.as_bool() { DiskType::SSD } else {DiskType::HDD};
+
+        sysinfo.disks.push(Disk {type, dgeo.DiskSize, String::new()});
 
         drives.push(desc);
     }
@@ -193,23 +192,28 @@ fn get_sys_info() {
             let processor = data
                 .first::<SMBiosProcessorInformation>()
                 .expect("Unable to retrieve processor info");
-            dbg!(processor.processor_version());
+            sysinfo.cpu = processor.processor_version().to_string();
+            dbg!(&sysinfo.cpu);
             let system = data
                 .first::<SMBiosSystemInformation>()
                 .expect("Unable to retrieve System info");
-            dbg!(system.serial_number());
-            dbg!(system.product_name());
-            dbg!(system.manufacturer());
-            dbg!(system.sku_number());
-            dbg!(system.version());
-            dbg!(system.uuid());
+            sysinfo.serial_number = system.serial_number().to_string();
+            dbg!(sysinfo.serial_number);
+            sysinfo.product_name = system.product_name().to_string();
+            dbg!(sysinfo.product_name);
+            sysinfo.manufacturer = system.manufacturer().to_string();
+            dbg!(sysinfo.manufacturer);
+            sysinfo.sku_number = system.sku_number().to_string();
+            dbg!(sysinfo.sku_number);
+            sysinfo.version = system.version().to_string();
+            dbg!(sysinfo.version);
+            sysinfo.uuid = system.uuid().to_string();
+            dbg!(sysinfo.uuid);
         }
         Err(e) => {}
     }
 
-    let osinfo = os_info::get();
-
-    dbg!(osinfo.edition());
+    sysinfo.os = os_info::get().edition();
 
     // let addr = MacAddressIterator::new().expect("Unable to fetch MAC Addresses");
 
@@ -261,6 +265,8 @@ fn get_sys_info() {
         // dbg!(smbios);
         // dbg!(&table);
     }
+
+    sysinfo
 }
 
 #[tokio::main]

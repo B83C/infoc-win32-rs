@@ -22,11 +22,26 @@ pub enum DiskType {
 #[derive(Archive, Serialize, Deserialize, Debug, Default)]
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug))]
+pub struct Disk {
+    pub disktype: DiskType,
+    pub disksize: u64,
+    pub model: String,
+}
+
+#[derive(Archive, Serialize, Deserialize, Debug, Default)]
+#[archive(check_bytes)]
+#[archive_attr(derive(Debug))]
+pub struct NA {
+    pub physical_address: [u8; 6],
+}
+
+#[derive(Archive, Serialize, Deserialize, Debug, Default)]
+#[archive(check_bytes)]
+#[archive_attr(derive(Debug))]
 pub struct SysInfo {
     pub cpu: String,
     pub os: String,
-    pub disk_size: u64,
-    pub disk_type: DiskType,
+    pub disks: Vec<Disk>,
     pub memory_size: u64,
     pub serial_number: String,
     pub product_name: String,
@@ -35,7 +50,7 @@ pub struct SysInfo {
     pub version: String,
     pub uuid: String,
     pub microsoft_office: Vec<String>,
-    pub physical_address: Vec<[u8; 6]>,
+    pub networkadapters: Vec<NetworkAdapter>,
 }
 
 // #[derive(Archive, Serialize, Deserialize, Debug, Default)]
