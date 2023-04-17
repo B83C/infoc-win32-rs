@@ -1,9 +1,11 @@
 use infoc::*;
 use infoc_server::*;
+use std::result::Result;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(CONNECTION_STR).await?;
+    dbg!(CONNECTION_STR);
     use std::sync::Arc;
 
     let db = microkv_open()?.set_auto_commit(true);
