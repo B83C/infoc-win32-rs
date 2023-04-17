@@ -1,5 +1,6 @@
 pub use bytes::Bytes;
 pub use futures::{SinkExt, StreamExt};
+pub use network_interface::*;
 pub use rkyv;
 use rkyv::*;
 use serde::Deserialize;
@@ -32,13 +33,14 @@ pub struct Disk {
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug))]
 pub struct NetworkAdapter {
-    pub physical_address: [u8; 6],
+    pub physical_address: Option<Vec<u8>>,
+    pub addr: Vec<std::net::IpAddr>,
 }
 
 #[derive(Archive, Serialize, Deserialize, Debug, Default)]
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug))]
-pub struct SysInfo {
+pub struct SysInfoV1 {
     pub cpu: String,
     pub os: String,
     pub disks: Vec<Disk>,
@@ -49,89 +51,9 @@ pub struct SysInfo {
     pub sku_number: String,
     pub version: String,
     pub uuid: Option<[u8; 16]>,
-    pub microsoft_office: Vec<String>,
+    pub microsoft_offices: Vec<String>,
     pub networkadapters: Vec<NetworkAdapter>,
 }
-
-// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
-// #[archive(check_bytes)]
-// #[archive_attr(derive(Debug))]
-// #[serde(rename = "Win32_OperatingSystem")]
-// #[serde(rename_all = "PascalCase")]
-// pub struct OperatingSystem {
-//     caption: String,
-// }
-
-// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
-// #[archive(check_bytes)]
-// #[archive_attr(derive(Debug))]
-// #[serde(rename = "Win32_ComputerSystem")]
-// #[serde(rename_all = "PascalCase")]
-// pub struct ComputerSystem {
-//     name: String,
-//     model: String,
-//     manufacturer: String,
-//     systemskunumber: String,
-//     systemtype: String,
-//     totalphysicalmemory: u64,
-//     username: String,
-// }
-
-// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
-// #[archive(check_bytes)]
-// #[archive_attr(derive(Debug))]
-// #[serde(rename = "Win32_ComputerSystemProduct")]
-// #[serde(rename_all = "PascalCase")]
-// pub struct ComputerSystemProduct {
-//     identifyingnumber: Option<String>,
-//     name: String,
-//     skunumber: Option<String>,
-//     vendor: Option<String>,
-//     version: Option<String>,
-// }
-
-// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
-// #[archive(check_bytes)]
-// #[archive_attr(derive(Debug))]
-// #[serde(rename = "Win32_DiskDrive")]
-// #[serde(rename_all = "PascalCase")]
-// pub struct DiskDrive {
-//     caption: String,
-//     size: u64,
-// }
-
-// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
-// #[archive(check_bytes)]
-// #[archive_attr(derive(Debug))]
-// #[serde(rename = "Win32_NetworkAdapterConfiguration")]
-// #[serde(rename_all = "PascalCase")]
-// pub struct NetworkAdapterConfiguration {
-//     dnshostname: Option<String>,
-//     ipaddress: Vec<String>,
-//     dhcpserver: Option<String>,
-//     macaddress: Option<String>,
-// }
-
-// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
-// #[archive(check_bytes)]
-// #[archive_attr(derive(Debug))]
-// #[serde(rename = "Win32_Processor")]
-// #[serde(rename_all = "PascalCase")]
-// pub struct Processor {
-//     caption: String,
-//     name: String,
-//     manufacturer: String,
-// }
-
-// #[derive(Archive, Serialize, Deserialize, Debug, Default)]
-// #[archive(check_bytes)]
-// #[archive_attr(derive(Debug))]
-// pub struct SysInfo {
-//     os: OperatingSystem,
-//     cs: ComputerSystem,
-//     csp: ComputerSystemProduct,
-//     nac: NetworkAdapterConfiguration,
-// }
 
 #[derive(Archive, Serialize, Deserialize, Default, Debug)]
 #[archive(check_bytes)]
@@ -176,7 +98,7 @@ pub struct Position {
 pub struct Infoc {
     pub accessories: Vec<Accessories>,
     pub pos: Position,
-    pub sysinfo: SysInfo,
+    pub sysinfo: SysInfoV1,
 }
 
 pub const DEPARTMENT: [&str; 25] = [
@@ -217,6 +139,11 @@ pub struct Packet {
 
 #[cfg(debug_assertions)]
 pub const CONNECTION_STR: &str = "localhost:8989";
+
+// #[cfg(debug_assertions)]
+// pub const CONNECTION_STR: &str = "10.20.63.164:8989";
+// #[cfg(debug_assertions)]
+// pub const CONNECTION_STR_SERVER: &str = "0.0.0.0:8989";
 
 #[cfg(not(debug_assertions))]
 pub const CONNECTION_STR: &str = "asset.chonghwakl.edu.my:8989";
