@@ -138,9 +138,9 @@ pub struct Packet {
 }
 
 #[cfg(debug_assertions)]
-pub const CONNECTION_STR_CLIENT: &str = "localhost:8989";
+pub const CONNECTION_STR_CLIENT: &str = "10.15.9.36:8989";
 #[cfg(debug_assertions)]
-pub const CONNECTION_STR_SERVER: &str = "localhost:8989";
+pub const CONNECTION_STR_SERVER: &str = "0.0.0.0:8989";
 
 // #[cfg(debug_assertions)]
 // pub const CONNECTION_STR_CLIENT: &str = "10.20.63.164:8989";

@@ -9,6 +9,7 @@ edition = "2021"
 clap = { version = "4.2.2", features = ["derive"] }
 csv = "1.2.1"
 infoc = { path = "../infoc" }
+libsodium-sys = "0.2.7"
 microkv = "0.2.9"
 rust_xlsxwriter = { version = "0.34.0", features = ["zlib"] }
 serde = "1.0.160"

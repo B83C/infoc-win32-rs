@@ -145,7 +145,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .iter()
                             .filter_map(|x| {
                                 if x.item == ArchivedItem::Printer {
-                                    x.details.remarks.iter().map(|x| x.as_str())
+                                    if let Some(x) = x.details.remarks.as_ref() {
+                                        Some(x.as_ref())
+                                        
+                                    } else {
+                                        None
+                                    }
                                 } else {
                                     None
                                 }
