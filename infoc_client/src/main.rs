@@ -178,14 +178,20 @@ fn get_sys_info() -> SysInfo {
             CloseHandle(handle);
         }
 
-        let type = if !desc.IncursSeekPenalty.as_bool() { DiskType::SSD } else {DiskType::HDD};
+        let disktype = if !desc.IncursSeekPenalty.as_bool() {
+            DiskType::SSD
+        } else {
+            DiskType::HDD
+        };
 
-        sysinfo.disks.push(Disk {type, dgeo.DiskSize, String::new()});
+        sysinfo.disks.push(Disk {
+            disktype,
+            disksize: dgeo.DiskSize as u64,
+            model: String::new(),
+        });
 
         drives.push(desc);
     }
-
-    let mut memory = 0u64;
 
     match table_load_from_device() {
         Ok(data) => {
@@ -198,50 +204,56 @@ fn get_sys_info() -> SysInfo {
                 .first::<SMBiosSystemInformation>()
                 .expect("Unable to retrieve System info");
             sysinfo.serial_number = system.serial_number().to_string();
-            dbg!(sysinfo.serial_number);
+            dbg!(&sysinfo.serial_number);
             sysinfo.product_name = system.product_name().to_string();
-            dbg!(sysinfo.product_name);
+            dbg!(&sysinfo.product_name);
             sysinfo.manufacturer = system.manufacturer().to_string();
-            dbg!(sysinfo.manufacturer);
+            dbg!(&sysinfo.manufacturer);
             sysinfo.sku_number = system.sku_number().to_string();
-            dbg!(sysinfo.sku_number);
+            dbg!(&sysinfo.sku_number);
             sysinfo.version = system.version().to_string();
-            dbg!(sysinfo.version);
-            sysinfo.uuid = system.uuid().to_string();
-            dbg!(sysinfo.uuid);
+            dbg!(&sysinfo.version);
+            sysinfo.uuid = if let Some(SystemUuidData::Uuid(x)) = system.uuid() {
+                Some(x.raw)
+            } else {
+                None
+            };
+            dbg!(&sysinfo.uuid);
         }
         Err(e) => {}
     }
 
-    sysinfo.os = os_info::get().edition();
+    sysinfo.os = os_info::get().edition().unwrap().to_string();
 
     // let addr = MacAddressIterator::new().expect("Unable to fetch MAC Addresses");
 
-    if let Ok(adapters) = get_adapters() {
-        let valid: Vec<Option<_>> = adapters
-            .iter()
-            .filter_map(|x| {
-                if x.prefixes().iter().any(|(y, _)| {
-                    if let std::net::IpAddr::V4(w) = y {
-                        let octets = w.octets();
-                        octets[0] == 10
-                            && [10, 15].iter().any(|x| *x == octets[1])
-                            && x.oper_status() == OperStatus::IfOperStatusUp
-                    } else {
-                        false
-                    }
-                }) {
-                    Some(x.physical_address())
-                } else {
-                    None
-                }
-            })
-            .collect();
-        dbg!(valid);
-    }
+    // if let Ok(adapters) = get_adapters() {
+    //     let valid: Vec<Option<_>> = adapters
+    //         .iter()
+    //         .filter_map(|x| {
+    //             if x.prefixes().iter().any(|(y, _)| {
+    //                 if let std::net::IpAddr::V4(w) = y {
+    //                     let octets = w.octets();
+    //                     octets[0] == 10
+    //                         && [10, 15].iter().any(|x| *x == octets[1])
+    //                         && x.oper_status() == OperStatus::IfOperStatusUp
+    //                 } else {
+    //                     false
+    //                 }
+    //             }) {
+    //                 Some(x.physical_address())
+    //             } else {
+    //                 None
+    //             }
+    //         })
+    //         .collect();
+    //     dbg!(valid);
+    // }
 
     unsafe {
+        let mut memory = 0u64;
         GetPhysicallyInstalledSystemMemory(&mut memory);
+        sysinfo.memory_size = memory;
         dbg!(memory >> 20);
 
         // let size = GetSystemFirmwareTable(

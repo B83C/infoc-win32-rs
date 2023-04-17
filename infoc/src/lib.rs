@@ -31,7 +31,7 @@ pub struct Disk {
 #[derive(Archive, Serialize, Deserialize, Debug, Default)]
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug))]
-pub struct NA {
+pub struct NetworkAdapter {
     pub physical_address: [u8; 6],
 }
 
@@ -48,7 +48,7 @@ pub struct SysInfo {
     pub manufacturer: String,
     pub sku_number: String,
     pub version: String,
-    pub uuid: String,
+    pub uuid: Option<[u8; 16]>,
     pub microsoft_office: Vec<String>,
     pub networkadapters: Vec<NetworkAdapter>,
 }

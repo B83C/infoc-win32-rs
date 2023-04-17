@@ -54,7 +54,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
 
             let keys = db.keys()?;
-            let mapping : Vec<(&str, &[u8])> = keys.iter().map(|x| (x.as_str(), db.get_unwrap::<&[u8]>(x).unwrap())).collect();
+            let mapping: Vec<(&str, Vec<u8>)> = keys
+                .iter()
+                .map(|x| (x.as_str(), db.get_unwrap::<Vec<u8>>(x).unwrap()))
+                .collect();
 
             dbg!(mapping);
 
