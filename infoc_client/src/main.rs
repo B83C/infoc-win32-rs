@@ -17,6 +17,8 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::mem::size_of;
 use std::result::Result;
+use winreg::enums::*;
+use winreg::RegKey;
 
 #[inline]
 fn prompt() -> Result<(String, Infoc), Box<dyn Error>> {
@@ -75,8 +77,8 @@ fn prompt() -> Result<(String, Infoc), Box<dyn Error>> {
     ))
 }
 
-fn get_sys_info() -> SysInfo {
-    let mut sysinfo: SysInfo = Default::default();
+fn get_sys_info() -> SysInfoV1 {
+    let mut sysinfo: SysInfoV1 = Default::default();
     let mut mounts = unsafe { GetLogicalDrives() };
     let mut accumulator = 0u8;
 
@@ -124,13 +126,14 @@ fn get_sys_info() -> SysInfo {
 
             let ent = (dn.DeviceType, dn.DeviceNumber);
 
-            if ent.0 != DRIVE_FIXED && ent.0 != DRIVE_REMOVABLE {
-                continue;
-            }
+            dbg!(&ent);
+
+            // if ent.0 != DRIVE_FIXED && ent.0 != DRIVE_REMOVABLE {
+            //     continue;
+            // }
 
             match disks.entry(ent) {
                 Entry::Occupied(_) => {
-                    CloseHandle(handle);
                     continue;
                 }
                 Entry::Vacant(v) => {
@@ -163,6 +166,7 @@ fn get_sys_info() -> SysInfo {
             )
             .as_bool();
             assert!(res);
+            dbg!(&handle);
             let res = DeviceIoControl(
                 handle,
                 IOCTL_DISK_GET_DRIVE_GEOMETRY_EX,
@@ -220,62 +224,52 @@ fn get_sys_info() -> SysInfo {
             };
             dbg!(&sysinfo.uuid);
         }
-        Err(e) => {}
+        Err(_) => {}
     }
 
     sysinfo.os = os_info::get().edition().unwrap().to_string();
 
-    // let addr = MacAddressIterator::new().expect("Unable to fetch MAC Addresses");
+    let office = RegKey::predef(HKEY_LOCAL_MACHINE)
+        .open_subkey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall")
+        .expect("Unable to open registry subkey");
 
-    // if let Ok(adapters) = get_adapters() {
-    //     let valid: Vec<Option<_>> = adapters
-    //         .iter()
-    //         .filter_map(|x| {
-    //             if x.prefixes().iter().any(|(y, _)| {
-    //                 if let std::net::IpAddr::V4(w) = y {
-    //                     let octets = w.octets();
-    //                     octets[0] == 10
-    //                         && [10, 15].iter().any(|x| *x == octets[1])
-    //                         && x.oper_status() == OperStatus::IfOperStatusUp
-    //                 } else {
-    //                     false
-    //                 }
-    //             }) {
-    //                 Some(x.physical_address())
-    //             } else {
-    //                 None
-    //             }
-    //         })
-    //         .collect();
-    //     dbg!(valid);
-    // }
+    let mut offices: Vec<String> = Vec::new();
+    office.enum_keys().map(|x| x.unwrap()).for_each(|x| {
+        if x.starts_with("Office") {
+            let subkey = office.open_subkey(x).expect("Unable to open office subkey");
+
+            if let Ok(x) = subkey.get_value::<String, _>("DisplayName") {
+                offices.push(x);
+            }
+        }
+    });
+
+    sysinfo.microsoft_offices = offices;
+
+    let adapters = get_adapters()
+        .expect("Unable to get network adapters")
+        .iter()
+        .filter_map(|x| match x.if_type() {
+            IfType::EthernetCsmacd | IfType::Ieee80211 => match x.oper_status() {
+                OperStatus::IfOperStatusUp
+                | OperStatus::IfOperStatusUnknown
+                | OperStatus::IfOperStatusDown => Some(NetworkAdapter {
+                    physical_address: x.physical_address().map(|x| x.to_owned()),
+                    addr: x.ip_addresses().to_vec(),
+                }),
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect();
+    dbg!(&adapters);
+    sysinfo.networkadapters = adapters;
 
     unsafe {
         let mut memory = 0u64;
         GetPhysicallyInstalledSystemMemory(&mut memory);
         sysinfo.memory_size = memory;
         dbg!(memory >> 20);
-
-        // let size = GetSystemFirmwareTable(
-        //     RSMB,
-        //     FIRMWARE_TABLE_ID(0),
-        //     None,
-        //     0,
-        // );
-        // dbg!(size);
-        // // let mut table: Vec<u8> = Vec::with_capacity(size as usize);
-        // let mut table: Vec<u8> = vec![0u8; size as usize];
-        // let size = GetSystemFirmwareTable(
-        //     RSMB,
-        //     FIRMWARE_TABLE_ID(0),
-        //     Some(table.as_mut_ptr() as *mut c_void),
-        //     size,
-        // );
-        // let (_, header, _) = table.align_to::<RawSMBIOSDataHeader>();
-        // let smbios = &table[size_of::<RawSMBIOSDataHeader>()..];
-        // dbg!(&header[0]);
-        // dbg!(smbios);
-        // dbg!(&table);
     }
 
     sysinfo
@@ -283,7 +277,12 @@ fn get_sys_info() -> SysInfo {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let sysinfo = get_sys_info();
+
+    dbg!(&sysinfo);
     let (read, write) = TcpStream::connect(CONNECTION_STR).await?.into_split();
+
+    dbg!(CONNECTION_STR);
 
     let (staffid, info) = prompt()?;
 
