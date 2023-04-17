@@ -7,6 +7,8 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.2.2", features = ["derive"] }
+csv = "1.2.1"
 infoc = { path = "../infoc" }
 microkv = "0.2.9"
 rust_xlsxwriter = { version = "0.34.0", features = ["zlib"] }
+serde = "1.0.160"

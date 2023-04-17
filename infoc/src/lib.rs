@@ -10,7 +10,7 @@ pub use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 #[derive(Archive, Serialize, Deserialize, Debug, Default)]
 #[archive(check_bytes)]
-#[archive_attr(derive(Debug))]
+#[archive_attr(derive(Debug, Display))]
 pub enum DiskType {
     SSD,
     HDD,
@@ -63,7 +63,7 @@ pub struct Details {
 
 #[derive(Archive, Serialize, Deserialize, Default, Debug, EnumVariantNames)]
 #[archive(check_bytes)]
-#[archive_attr(derive(Debug))]
+#[archive_attr(derive(Debug, Eq, PartialEq))]
 pub enum Item {
     Mouse,
     Keyboard,
