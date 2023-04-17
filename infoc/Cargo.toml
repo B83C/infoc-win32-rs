@@ -14,5 +14,3 @@ strum = { version = "0.24.1", features = ["derive", "phf", "strum_macros"] }
 strum_macros = "0.24.3"
 tokio = { version = "1.27.0", features = ["full"] }
 tokio-util = { version = "0.7.7", features = ["full"] }
-windows = "0.48.0"
-wmi = "0.12.2"

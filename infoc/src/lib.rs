@@ -1,9 +1,7 @@
 pub use bytes::Bytes;
 pub use futures::{SinkExt, StreamExt};
-pub use network_interface::*;
 pub use rkyv;
 use rkyv::*;
-use serde::Deserialize;
 pub use strum::VariantNames;
 use strum_macros::*;
 pub use tokio;
@@ -33,8 +31,8 @@ pub struct Disk {
 #[archive(check_bytes)]
 #[archive_attr(derive(Debug))]
 pub struct NetworkAdapter {
-    pub physical_address: Option<Vec<u8>>,
-    pub addr: Vec<std::net::IpAddr>,
+    pub physical_address: [u8; 6],
+    pub addr: Vec<std::net::Ipv4Addr>,
 }
 
 #[derive(Archive, Serialize, Deserialize, Debug, Default)]
@@ -130,26 +128,40 @@ pub const DEPARTMENT: [&str; 25] = [
 ];
 
 #[derive(Archive, Deserialize, Serialize, Debug)]
+#[archive(check_bytes)]
 #[archive_attr(derive(Debug))]
 pub struct Packet {
     pub magic: u32,
-    pub version: u16,
+    pub version: VERSION,
     pub staffid: String,
+    pub encinfo: AlignedVec,
 }
 
 #[cfg(debug_assertions)]
-pub const CONNECTION_STR: &str = "localhost:8989";
+pub const CONNECTION_STR_CLIENT: &str = "localhost:8989";
+#[cfg(debug_assertions)]
+pub const CONNECTION_STR_SERVER: &str = "localhost:8989";
 
 // #[cfg(debug_assertions)]
-// pub const CONNECTION_STR: &str = "10.20.63.164:8989";
+// pub const CONNECTION_STR_CLIENT: &str = "10.20.63.164:8989";
 // #[cfg(debug_assertions)]
-// pub const CONNECTION_STR_SERVER: &str = "0.0.0.0:8989";
+// pub const CONNECTION_STR_SERVER_CLIENT: &str = "0.0.0.0:8989";
 
 #[cfg(not(debug_assertions))]
-pub const CONNECTION_STR: &str = "asset.chonghwakl.edu.my:8989";
+pub const CONNECTION_STR_CLIENT: &str = "asset.chonghwakl.edu.my:8989";
+#[cfg(not(debug_assertions))]
+pub const CONNECTION_STR_SERVER: &str = "0.0.0.0:8989";
 
 pub const MAGIC: u32 = u32::from_le_bytes([b'C', b'H', b'K', b'L']);
-pub const VERSION: u16 = 1;
+
+#[derive(Archive, Deserialize, Serialize, Debug)]
+#[archive(check_bytes)]
+#[archive_attr(derive(Debug))]
+pub enum VERSION {
+    V1,
+}
+
+pub const CUR_VERSION: VERSION = VERSION::V1;
 
 pub fn decode<'a>(bytes: &'a [u8]) -> &'a ArchivedInfoc {
     rkyv::check_archived_root::<Infoc>(bytes).unwrap()

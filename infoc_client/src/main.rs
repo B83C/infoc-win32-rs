@@ -11,7 +11,7 @@ use ::windows::{
     Win32::System::IO::*,
 };
 use core::ffi::c_void;
-use ipconfig::*;
+use default_net::*;
 use smbioslib::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -110,7 +110,7 @@ fn get_sys_info() -> SysInfoV1 {
 
         unsafe {
             let mut dn: STORAGE_DEVICE_NUMBER = Default::default();
-            let res = DeviceIoControl(
+            DeviceIoControl(
                 handle,
                 IOCTL_STORAGE_GET_DEVICE_NUMBER,
                 None,
@@ -120,9 +120,7 @@ fn get_sys_info() -> SysInfoV1 {
                 None,
                 None,
             )
-            .as_bool();
-
-            assert!(res);
+            .expect("IOCTL_STORAGE_GET_DEVICE_NUMBER has failed");
 
             let ent = (dn.DeviceType, dn.DeviceNumber);
 
@@ -246,24 +244,42 @@ fn get_sys_info() -> SysInfoV1 {
 
     sysinfo.microsoft_offices = offices;
 
-    let adapters = get_adapters()
-        .expect("Unable to get network adapters")
-        .iter()
-        .filter_map(|x| match x.if_type() {
-            IfType::EthernetCsmacd | IfType::Ieee80211 => match x.oper_status() {
-                OperStatus::IfOperStatusUp
-                | OperStatus::IfOperStatusUnknown
-                | OperStatus::IfOperStatusDown => Some(NetworkAdapter {
-                    physical_address: x.physical_address().map(|x| x.to_owned()),
-                    addr: x.ip_addresses().to_vec(),
-                }),
-                _ => None,
-            },
+    let interfaces = get_interfaces()
+        .into_iter()
+        .filter_map(|x| match x.if_type {
+            interface::InterfaceType::Wireless80211 | interface::InterfaceType::Ethernet => {
+                if let Some(mac_addr) = x.mac_addr {
+                    Some(NetworkAdapter {
+                        physical_address: mac_addr.octets(),
+                        addr: x.ipv4.iter().map(|x| x.addr).collect(),
+                    })
+                } else {
+                    None
+                }
+            }
             _ => None,
         })
         .collect();
-    dbg!(&adapters);
-    sysinfo.networkadapters = adapters;
+    dbg!(&interfaces);
+    sysinfo.networkadapters = interfaces;
+    // let adapters = get_adapters()
+    //     .expect("Unable to get network adapters")
+    //     .iter()
+    //     .filter_map(|x| match x.if_type() {
+    //         IfType::EthernetCsmacd | IfType::Ieee80211 => match x.oper_status() {
+    //             OperStatus::IfOperStatusUp
+    //             | OperStatus::IfOperStatusUnknown
+    //             | OperStatus::IfOperStatusDown => Some(NetworkAdapter {
+    //                 physical_address: x.physical_address().map(|x| x.to_owned()),
+    //                 addr: x.ip_addresses().to_vec(),
+    //             }),
+    //             _ => None,
+    //         },
+    //         _ => None,
+    //     })
+    //     .collect();
+    // dbg!(&adapters);
+    // sysinfo.networkadapters = adapters;
 
     unsafe {
         let mut memory = 0u64;
@@ -280,9 +296,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let sysinfo = get_sys_info();
 
     dbg!(&sysinfo);
-    let (read, write) = TcpStream::connect(CONNECTION_STR).await?.into_split();
 
-    dbg!(CONNECTION_STR);
+    let (read, write) = TcpStream::connect(CONNECTION_STR_CLIENT)
+        .await?
+        .into_split();
+
+    println!("Connecting to server at {}", CONNECTION_STR_CLIENT);
 
     let (staffid, info) = prompt()?;
 
@@ -292,34 +311,39 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     if ans {
         println!("Submitting");
-        let enc = encode(&info).to_vec();
+        let encinfo = encode(&info);
 
-        //MANUFACTURER, MODEL, SERIAL NUMBER, CPU, RAM, DISK, SYSTEM, MSOFFICE,
-        //IP, HOSTNAME, MAC
         let packet = Packet {
             magic: MAGIC,
-            version: VERSION,
+            version: CUR_VERSION,
             staffid,
+            encinfo,
         };
 
         let mut transport = LengthDelimitedCodec::builder()
             .length_field_type::<u32>()
             .new_write(write);
 
-        let t = rkyv::to_bytes::<_, 64>(&packet).unwrap().to_vec();
-        transport.send(t.into()).await?;
-
-        // assert_eq!(transport.next().await.unwrap().unwrap(), Bytes::from("OK"));
-
-        transport.send(enc.into()).await?;
+        let t = rkyv::to_bytes::<_, 16384>(&packet).unwrap();
+        transport
+            .send(Bytes::from_iter(t.iter().map(|x| *x)))
+            .await?;
 
         let mut transport = LengthDelimitedCodec::builder()
             .length_field_type::<u32>()
             .new_read(read);
 
-        assert_eq!(transport.next().await.unwrap().unwrap(), Bytes::from("OK"));
+        let response = transport
+            .next()
+            .await
+            .unwrap()
+            .expect("Unable to receive response from server");
 
-        println!("Uploaded successfully");
+        if response == Bytes::from("OK") {
+            println!("Uploaded successfully");
+        } else {
+            println!("Server error : {:?}", response);
+        }
         // loop {
         //     stream.writable().await?;
 
