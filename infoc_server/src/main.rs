@@ -28,7 +28,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .length_field_type::<u32>()
                 .new_read(read);
 
-            let msg = transport.next().await.unwrap().unwrap();
+            let msg = transport
+                .next()
+                .await
+                .unwrap()
+                .expect("Unable to read value from client");
 
             let packet = rkyv::check_archived_root::<Packet>(&msg[..]).ok();
 

@@ -124,7 +124,7 @@ fn get_sys_info() -> SysInfoV1 {
 
             let ent = (dn.DeviceType, dn.DeviceNumber);
 
-            dbg!(&ent);
+            // dbg!(&ent);
 
             // if ent.0 != DRIVE_FIXED && ent.0 != DRIVE_REMOVABLE {
             //     continue;
@@ -140,7 +140,7 @@ fn get_sys_info() -> SysInfoV1 {
             }
         }
 
-        let squery = STORAGE_PROPERTY_QUERY {
+        let mut squery = STORAGE_PROPERTY_QUERY {
             PropertyId: StorageDeviceSeekPenaltyProperty,
             QueryType: PropertyStandardQuery,
             AdditionalParameters: [0],
@@ -148,8 +148,10 @@ fn get_sys_info() -> SysInfoV1 {
 
         let mut desc: DEVICE_SEEK_PENALTY_DESCRIPTOR = Default::default();
         let mut dgeo: DISK_GEOMETRY_EX = Default::default();
+        let mut model: STORAGE_ADAPTER_SERIAL_NUMBER = Default::default();
 
         let mut size: u32 = 0;
+        let mut model_name = None;
 
         unsafe {
             let res = DeviceIoControl(
@@ -163,8 +165,10 @@ fn get_sys_info() -> SysInfoV1 {
                 None,
             )
             .as_bool();
-            assert!(res);
-            dbg!(&handle);
+            if res {
+                eprintln!("Unable to query storage property");
+            }
+            // dbg!(&handle);
             let res = DeviceIoControl(
                 handle,
                 IOCTL_DISK_GET_DRIVE_GEOMETRY_EX,
@@ -176,7 +180,29 @@ fn get_sys_info() -> SysInfoV1 {
                 None,
             )
             .as_bool();
-            assert!(res);
+            if res {
+                eprintln!("Unable to query storage geometry");
+            }
+            squery.PropertyId = StorageAdapterSerialNumberProperty;
+            let res = DeviceIoControl(
+                handle,
+                IOCTL_STORAGE_QUERY_PROPERTY,
+                Some(&squery as *const STORAGE_PROPERTY_QUERY as *const c_void),
+                size_of::<STORAGE_PROPERTY_QUERY>() as u32,
+                Some(&mut model as *mut STORAGE_ADAPTER_SERIAL_NUMBER as *mut c_void),
+                size_of::<STORAGE_ADAPTER_SERIAL_NUMBER>() as u32,
+                Some(&mut size),
+                None,
+            )
+            .as_bool();
+            if res {
+                let range_end = model
+                    .SerialNumber
+                    .iter()
+                    .position(|&c| c == '\0' as u16 || c == ' ' as u16)
+                    .unwrap_or(model.SerialNumber.len());
+                model_name = Some(String::from_utf16_lossy(&model.SerialNumber[..range_end]));
+            }
             CloseHandle(handle);
         }
 
@@ -189,7 +215,7 @@ fn get_sys_info() -> SysInfoV1 {
         sysinfo.disks.push(Disk {
             disktype,
             disksize: dgeo.DiskSize as u64,
-            model: String::new(),
+            model: model_name,
         });
 
         drives.push(desc);
@@ -201,31 +227,37 @@ fn get_sys_info() -> SysInfoV1 {
                 .first::<SMBiosProcessorInformation>()
                 .expect("Unable to retrieve processor info");
             sysinfo.cpu = processor.processor_version().to_string();
-            dbg!(&sysinfo.cpu);
+            // dbg!(&sysinfo.cpu);
             let system = data
                 .first::<SMBiosSystemInformation>()
                 .expect("Unable to retrieve System info");
             sysinfo.serial_number = system.serial_number().to_string();
-            dbg!(&sysinfo.serial_number);
+            // dbg!(&sysinfo.serial_number);
             sysinfo.product_name = system.product_name().to_string();
-            dbg!(&sysinfo.product_name);
+            // dbg!(&sysinfo.product_name);
             sysinfo.manufacturer = system.manufacturer().to_string();
-            dbg!(&sysinfo.manufacturer);
+            // dbg!(&sysinfo.manufacturer);
             sysinfo.sku_number = system.sku_number().to_string();
-            dbg!(&sysinfo.sku_number);
+            // dbg!(&sysinfo.sku_number);
             sysinfo.version = system.version().to_string();
-            dbg!(&sysinfo.version);
+            // dbg!(&sysinfo.version);
             sysinfo.uuid = if let Some(SystemUuidData::Uuid(x)) = system.uuid() {
                 Some(x.raw)
             } else {
                 None
             };
-            dbg!(&sysinfo.uuid);
+            // dbg!(&sysinfo.uuid);
         }
         Err(_) => {}
     }
 
-    sysinfo.os = os_info::get().edition().unwrap().to_string();
+    sysinfo.os = if let Some(os) = os_info::get().edition() {
+        os.to_string()
+    } else {
+        Text::new("OS version can't be detected, please enter manually : ")
+            .prompt()
+            .expect("Unable to get input")
+    };
 
     let office = RegKey::predef(HKEY_LOCAL_MACHINE)
         .open_subkey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall")
@@ -234,15 +266,23 @@ fn get_sys_info() -> SysInfoV1 {
     let mut offices: Vec<String> = Vec::new();
     office.enum_keys().map(|x| x.unwrap()).for_each(|x| {
         if x.starts_with("Office") {
-            let subkey = office.open_subkey(x).expect("Unable to open office subkey");
+            let subkey = office.open_subkey(x);
 
-            if let Ok(x) = subkey.get_value::<String, _>("DisplayName") {
-                offices.push(x);
+            if let Ok(subkey) = subkey {
+                if let Ok(x) = subkey.get_value::<String, _>("DisplayName") {
+                    offices.push(x);
+                }
             }
         }
     });
 
-    sysinfo.microsoft_offices = offices;
+    sysinfo.microsoft_offices = if offices.len() != 0 {
+        offices
+    } else {
+        vec![Text::new("Offices not detected, enter manually")
+            .prompt()
+            .expect("Unable to get input")]
+    };
 
     let interfaces = get_interfaces()
         .into_iter()
@@ -260,7 +300,7 @@ fn get_sys_info() -> SysInfoV1 {
             _ => None,
         })
         .collect();
-    dbg!(&interfaces);
+    // dbg!(&interfaces);
     sysinfo.networkadapters = interfaces;
     // let adapters = get_adapters()
     //     .expect("Unable to get network adapters")
@@ -293,6 +333,8 @@ fn get_sys_info() -> SysInfoV1 {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    win32console::console::WinConsole::set_output_code(936).expect("Unable to set output code");
+
     let sysinfo = get_sys_info();
 
     dbg!(&sysinfo);
@@ -303,7 +345,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Connecting to server at {}", CONNECTION_STR_CLIENT);
 
-    let (staffid, info) = prompt()?;
+    let (staffid, mut info) = prompt()?;
+
+    info.sysinfo = sysinfo;
+    dbg!(&info.sysinfo);
 
     let ans = Confirm::new("Do you want to submit now?")
         .with_default(true)
@@ -311,7 +356,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     if ans {
         println!("Submitting");
+
+        dbg!(&info);
         let encinfo = encode(&info);
+        dbg!(&encinfo);
+        let decinfo = decode(&encinfo);
+        dbg!(&decinfo);
 
         let packet = Packet {
             magic: MAGIC,
@@ -367,6 +417,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         //     }
         // }
     }
+
+    let _ = Text::new("Quit now?").prompt()?;
 
     Ok(())
 }

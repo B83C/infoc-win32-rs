@@ -75,6 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let enc = db
                     .get_unwrap::<Vec<u8>>(x)
                     .expect("Unable to get entry by key");
+                dbg!(&enc);
                 let enc = decode(enc.as_slice());
                 worksheet
                     .write(i as u32, 0, i as u32)
@@ -147,7 +148,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 if x.item == ArchivedItem::Printer {
                                     if let Some(x) = x.details.remarks.as_ref() {
                                         Some(x.as_ref())
-                                        
                                     } else {
                                         None
                                     }

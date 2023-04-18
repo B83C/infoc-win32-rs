@@ -24,7 +24,7 @@ pub enum DiskType {
 pub struct Disk {
     pub disktype: DiskType,
     pub disksize: u64,
-    pub model: String,
+    pub model: Option<String>,
 }
 
 #[derive(Archive, Serialize, Deserialize, Debug, Default)]
@@ -147,8 +147,12 @@ pub const CONNECTION_STR_SERVER: &str = "0.0.0.0:8989";
 // #[cfg(debug_assertions)]
 // pub const CONNECTION_STR_SERVER_CLIENT: &str = "0.0.0.0:8989";
 
+// #[cfg(not(debug_assertions))]
+// pub const CONNECTION_STR_CLIENT: &str = "10.15.9.36:8989";
 #[cfg(not(debug_assertions))]
 pub const CONNECTION_STR_CLIENT: &str = "asset.chonghwakl.edu.my:8989";
+#[cfg(not(debug_assertions))]
+pub const CONNECTION_STR_CLIENT2: &str = ":8989";
 #[cfg(not(debug_assertions))]
 pub const CONNECTION_STR_SERVER: &str = "0.0.0.0:8989";
 
