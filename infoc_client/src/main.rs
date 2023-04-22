@@ -712,8 +712,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             println!("Saving data to disk");
 
-            block_on(db.set(packet.staffid.as_bytes(), packet.encinfo.into())).expect("Unable to set data");
-            block_on(db.flush()).expect("Unable to flush data");
+            let cmds = vec![
+                CommandData::remove(packet.staffid.clone().into_bytes()),
+                CommandData::set(
+                    packet.staffid.clone().into_bytes(),
+                    packet.encinfo.into(),
+                ),
+            ];
+            block_on(db.batch(cmds)).expect("Unable to put to database");
+            block_on(db.flush()).expect("Unable to flush to database");
         }
     }
 
