@@ -317,7 +317,7 @@ pub const CONNECTION_STR_SERVER: &str = "0.0.0.0:8989";
 // #[cfg(not(debug_assertions))]
 // pub const CONNECTION_STR_CLIENT: &str = "10.15.9.36:8989";
 #[cfg(not(debug_assertions))]
-pub const CONNECTION_STR_CLIENT: [&str; _] = ["asset.chonghwakl.edu.my:8989"];
+pub const CONNECTION_STR_CLIENT: &[&str] = &["asset.chonghwakl.edu.my:8989"];
 #[cfg(not(debug_assertions))]
 pub const CONNECTION_STR_SERVER: &str = "0.0.0.0:8989";
 

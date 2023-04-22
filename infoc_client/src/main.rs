@@ -336,7 +336,6 @@ async fn get_sys_info() -> Result<SysInfoV1, Box<dyn std::error::Error>> {
         let x = x.unwrap();
         if let Ok(num) = x.parse::<f32>() {
             let num = num as u8;
-            dbg!(num);
             // let subkey = office.open_subkey(x);
 
             // if let Ok(subkey) = subkey {
