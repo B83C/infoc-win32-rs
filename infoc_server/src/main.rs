@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         let (socket, addr) = listener.accept().await?;
 
-        println!("Recieved connections from {:?}", addr);
+        println!("Received connections from {:?}", addr);
 
         let db = db.clone();
 
@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             //         .expect("Unable to deserialize encinfo");
                             // dbg!(&header);
                             let cmds = vec![
-                                CommandData::remove(header.staffid.clone().into_bytes()),
+                                // CommandData::remove(header.staffid.clone().into_bytes()),
                                 CommandData::set(
                                     header.staffid.into_bytes(),
                                     header.encinfo.into(),

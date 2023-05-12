@@ -317,7 +317,7 @@ pub const CONNECTION_STR_SERVER: &str = "0.0.0.0:8989";
 // #[cfg(not(debug_assertions))]
 // pub const CONNECTION_STR_CLIENT: &str = "10.15.9.36:8989";
 #[cfg(not(debug_assertions))]
-pub const CONNECTION_STR_CLIENT: &[&str] = &["asset.chonghwakl.edu.my:8989"];
+pub const CONNECTION_STR_CLIENT: &[&str] = &["asset.chonghwakl.edu.my:8989", "10.15.9.22:8989"];
 #[cfg(not(debug_assertions))]
 pub const CONNECTION_STR_SERVER: &str = "0.0.0.0:8989";
 
@@ -352,6 +352,9 @@ pub const DB_NAME: &str = "kv_debug.db";
 #[cfg(not(debug_assertions))]
 pub const DB_NAME: &str = "kv.db";
 
+pub const REGKEY1: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+
+pub const REGKEY2: &str = "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
 // pub use rust_kv::{KvEngine, KvStore, Result};
 // pub const DB_NAME_TEMP: &str = "kv_temp.db";
 

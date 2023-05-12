@@ -18,3 +18,7 @@ win32console = "0.1.5"
 wmi = "0.12.2"
 # chrono = "0.4.24"
 futures = "0.3.28"
+static_vcruntime = "2.0.0"
+
+[build-dependencies]
+static_vcruntime = "2.0"

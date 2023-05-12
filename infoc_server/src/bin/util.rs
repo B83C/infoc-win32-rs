@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
+#![feature(int_roundings)]
 use clap::Parser;
 use infoc::*;
 use rust_xlsxwriter::Workbook;
@@ -26,7 +27,6 @@ struct Mapping {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mode = Mode::parse();
-    let db = HashStore::open(DB_NAME).await.expect("Unable to open db");
     match mode.command.as_str() {
         "export" => {
             let mut output = mode.output.unwrap_or_else(|| PathBuf::from("chkl_data"));
@@ -63,7 +63,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "使用者",
                 "Printer",
                 "Desktop 年份",
-            ];
+                "位置",
+                     ];
 
             cols.iter().enumerate().for_each(|(i, x)| {
                 worksheet
@@ -71,173 +72,196 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .expect("Error occured whilst writing column names");
             });
 
-            db.keys_from_index()
-                .await
-                .iter()
-                .enumerate()
-                .for_each(|(i, x)| {
-                    let i = i + 1;
-                    use futures::executor::block_on;
-                    let ent = block_on(db.get(x))
-                        .expect("Unable to get value")
-                        .expect("Unable to unwrap value");
-                    let enc = decode(&ent);
-                    worksheet
-                        .write(i as u32, 0, i as u32)
-                        .expect("Unable to write to No");
-                    worksheet
-                        .write(
-                            i as u32,
-                            1,
-                            enc.sysinfo
-                                .cs
-                                .Manufacturer
-                                .as_ref()
-                                .map(|x| x.as_ref())
-                                .unwrap_or(""),
-                        )
-                        .expect("Unable to write to Manufacturer");
-                    worksheet
-                        .write(
-                            i as u32,
-                            2,
-                            enc.sysinfo
-                                .cs
-                                .Model
-                                .as_ref()
-                                .map(|x| x.as_ref())
-                                .unwrap_or(""),
-                        )
-                        .expect("Unable to write to Model");
-                    worksheet
-                        .write(
-                            i as u32,
-                            3,
-                            enc.sysinfo
-                                .bios
-                                .SerialNumber
-                                .as_ref()
-                                .map(|x| x.as_ref())
-                                .unwrap_or(""),
-                        )
-                        .expect("Unable to write to S/No");
-                    worksheet
-                        .write(
-                            i as u32,
-                            4,
-                            enc.sysinfo
-                                .cpu
-                                .Name
-                                .as_ref()
-                                .map(|x| x.as_ref())
-                                .unwrap_or(""),
-                        )
-                        .expect("Unable to write to CPU");
-                    worksheet
-                        .write(
-                            i as u32,
-                            5,
-                            format!(
-                                "{}GB",
-                                enc.sysinfo.cs.TotalPhysicalMemory.div_euclid(1000000)
+            let mut i = 1;
+            for NAME in ["kv.db", "kv1.db", "kv2.db", "kv3.db"] {
+                let db = HashStore::open(NAME).await.expect("Unable to open db");
+                db.keys_from_index()
+                    .await
+                    .iter()
+                    // .enumerate()
+                    .for_each(|x| {
+                        use futures::executor::block_on;
+                        let ent = block_on(db.get(x))
+                            .expect("Unable to get value")
+                            .expect("Unable to unwrap value");
+                        let enc = decode(&ent);
+                        worksheet
+                            .write(i as u32, 0, i as u32)
+                            .expect("Unable to write to No");
+                        worksheet
+                            .write(
+                                i as u32,
+                                1,
+                                enc.sysinfo
+                                    .cs
+                                    .Manufacturer
+                                    .as_ref()
+                                    .map(|x| x.as_ref())
+                                    .unwrap_or(""),
                             )
-                            .as_str(),
-                        )
-                        .expect("Unable to write to CPU");
-                    worksheet
-                        .write(
-                            i as u32,
-                            6,
-                            match enc.sysinfo.disks {
-                                ArchivedDisk::MSFT(ref x) => x
+                            .expect("Unable to write to Manufacturer");
+                        worksheet
+                            .write(
+                                i as u32,
+                                2,
+                                enc.sysinfo
+                                    .cs
+                                    .Model
                                     .as_ref()
-                                    .iter()
-                                    .map(|x| {
-                                        format!(
-                                            "{}GB {}",
-                                            x.Size.div_euclid(1000000000),
-                                            x.MediaType.to_string(),
-                                        )
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join(", "),
-                                ArchivedDisk::W32(ref x) => x
+                                    .map(|x| x.as_ref())
+                                    .unwrap_or(""),
+                            )
+                            .expect("Unable to write to Model");
+                        worksheet
+                            .write(
+                                i as u32,
+                                3,
+                                enc.sysinfo
+                                    .bios
+                                    .SerialNumber
                                     .as_ref()
-                                    .iter()
-                                    .map(|x| {
-                                        format!(
-                                            "{}GB {}",
-                                            x.Size.div_euclid(1000000000),
-                                            x.MediaType.to_string(),
-                                        )
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join(", "),
-                            }
-                            .as_str(),
-                        )
-                        .expect("Unable to write to disks");
-                    worksheet
-                        .write(
-                            i as u32,
-                            7,
-                            enc.sysinfo
-                                .os
-                                .Caption
-                                .as_ref()
-                                .map(|x| x.as_ref())
-                                .unwrap_or(""),
-                        )
-                        .expect("Unable to write to OS Name");
-                    worksheet
-                        .write(
-                            i as u32,
-                            8,
-                            enc.sysinfo
-                                .msoffice
-                                .as_ref()
-                                .iter()
-                                .map(|x| ["Microsoft Office ", x].concat())
-                                .collect::<Vec<String>>()
-                                .join(", ")
+                                    .map(|x| x.as_ref())
+                                    .unwrap_or(""),
+                            )
+                            .expect("Unable to write to S/No");
+                        worksheet
+                            .write(
+                                i as u32,
+                                4,
+                                enc.sysinfo
+                                    .cpu
+                                    .Name
+                                    .as_ref()
+                                    .map(|x| x.as_ref())
+                                    .unwrap_or(""),
+                            )
+                            .expect("Unable to write to CPU");
+                        worksheet
+                            .write(
+                                i as u32,
+                                5,
+                                format!(
+                                    "{}GB",
+                                    enc.sysinfo.cs.TotalPhysicalMemory.div_euclid(1000000000)
+                                )
                                 .as_str(),
-                        )
-                        .expect("Unable to write to OS");
-                    worksheet
-                        .write(i as u32, 9, DEPARTMENT[enc.pos.department as usize])
-                        .expect("Unable to write to Department");
-                    worksheet
-                        .write(
-                            i as u32,
-                            10,
-                            map.get(x.as_slice())
-                                .map(|x| x.as_str())
-                                .unwrap_or("Unknown"),
-                        )
-                        .expect("Unable to write to Name");
-                    worksheet
-                        .write(
-                            i as u32,
-                            11,
-                            enc.accessories
-                                .iter()
-                                .filter_map(|x| {
-                                    if x.item == ArchivedItem::Printer {
-                                        if let Some(x) = x.details.remarks.as_ref() {
-                                            Some(x.as_ref())
+                            )
+                            .expect("Unable to write to CPU");
+                        worksheet
+                            .write(
+                                i as u32,
+                                6,
+                                match enc.sysinfo.disks {
+                                    ArchivedDisk::MSFT(ref x) => x
+                                        .as_ref()
+                                        .iter()
+                                        .map(|x| {
+                                            format!(
+                                                "{}GB {}",
+                                                x.Size.div_euclid(1000000000),
+                                                x.MediaType.to_string(),
+                                            )
+                                        })
+                                        .collect::<Vec<_>>()
+                                        .join(", "),
+                                    ArchivedDisk::W32(ref x) => x
+                                        .as_ref()
+                                        .iter()
+                                        .map(|x| {
+                                            format!(
+                                                "{}GB {}",
+                                                x.Size.div_euclid(1000000000),
+                                                x.MediaType.to_string(),
+                                            )
+                                        })
+                                        .collect::<Vec<_>>()
+                                        .join(", "),
+                                }
+                                .as_str(),
+                            )
+                            .expect("Unable to write to disks");
+                        worksheet
+                            .write(
+                                i as u32,
+                                7,
+                                enc.sysinfo
+                                    .os
+                                    .Caption
+                                    .as_ref()
+                                    .map(|x| x.as_ref())
+                                    .unwrap_or(""),
+                            )
+                            .expect("Unable to write to OS Name");
+                        worksheet
+                            .write(
+                                i as u32,
+                                8,
+                                enc.sysinfo
+                                    .msoffice
+                                    .as_ref()
+                                    .iter()
+                                    .map(|x| ["Microsoft Office ", x].concat())
+                                    .collect::<Vec<String>>()
+                                    .join(", ")
+                                    .as_str(),
+                            )
+                            .expect("Unable to write to OS");
+                        worksheet
+                            .write(
+                                i as u32,
+                                9,
+                                match enc.pos.department as usize {
+                                    24 => enc
+                                        .pos
+                                        .remarks
+                                        .as_ref()
+                                        .map(|x| x.as_ref())
+                                        .unwrap_or(&"None"),
+                                    x => DEPARTMENT[x],
+                                },
+                            )
+                            .expect("Unable to write to Department");
+                        worksheet
+                            .write(
+                                i as u32,
+                                10,
+                                map.get(x.as_slice()).map(|x| x.as_str()).unwrap_or(
+                                    std::str::from_utf8(x.as_slice()).unwrap_or("Unknown"),
+                                ),
+                            )
+                            .expect("Unable to write to Name");
+                        worksheet
+                            .write(
+                                i as u32,
+                                11,
+                                enc.accessories
+                                    .iter()
+                                    .filter_map(|x| {
+                                        if x.item == ArchivedItem::Printer {
+                                            if let Some(x) = x.details.remarks.as_ref() {
+                                                Some(x.as_ref())
+                                            } else {
+                                                None
+                                            }
                                         } else {
                                             None
                                         }
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                                .as_str(),
-                        )
-                        .expect("Unable to write to Printer");
-                });
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                                    .as_str(),
+                            )
+                            .expect("Unable to write to Printer");
+                        worksheet
+                            .write(i as u32, 13, enc.pos.position)
+                            .expect("Unable to write to Position");
+                        // dbg!(x);
+                        // dbg!(&enc.pos);
+                        i += 1;
+                    });
+            }
+
+            dbg!(i);
 
             worksheet.autofit();
             worksheet.set_freeze_panes(1, 0)?;

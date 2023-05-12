@@ -4,7 +4,7 @@
 #![allow(non_camel_case_types)]
 use futures::executor::block_on;
 use infoc::*;
-use inquire::{length, Confirm, CustomType, Select, Text};
+use inquire::{length, Confirm, CustomType, Select, Text, MultiSelect};
 use std::error::Error;
 use ::windows::{
     core::*, Win32::Foundation::*, Win32::Storage::FileSystem::*, Win32::System::Ioctl::*,
@@ -23,11 +23,12 @@ use wmi::*;
 fn prompt() -> Result<(String, Vec<Accessories>, Position), Box<dyn Error>> {
     let staffid = Text::new("Staff ID : ").prompt()?;
 
-    let department = Select::new("Department", DEPARTMENT.to_vec()).raw_prompt()?;
+    let department = Select::new("Department", DEPARTMENT.into_iter().enumerate().map(|(i, x)| format!("{} {}", i, x)).collect()).raw_prompt()?;
     let mut remarks = None;
     if department.index == (DEPARTMENT.len() - 1) {
         remarks = Some(Text::new("Please enter your department : ").prompt()?);
     }
+    
     let department = department.index as u8;
     let position = CustomType::<u8>::new("Position : ").prompt()?;
 
@@ -327,50 +328,104 @@ async fn get_sys_info() -> Result<SysInfoV1, Box<dyn std::error::Error>> {
         Win32_BIOS { SerialNumber, Manufacturer, Description}
     };
 
-    let office = RegKey::predef(HKEY_LOCAL_MACHINE)
-        .open_subkey("Software\\Microsoft\\Office")
-        .expect("Unable to open registry subkey");
+
+    
+    // let office = RegKey::predef(HKEY_LOCAL_MACHINE)
+    //     .open_subkey("Software\\Microsoft\\Office")
+    //     .expect("Unable to open registry subkey");
+    
+    // println!("We detected the following mircosoft office versions : ");
+    // office.enum_keys().for_each(|x| {
+    //     let x = x.unwrap();
+    //     if let Ok(num) = x.parse::<f32>() {
+    //         let num = num as u8;
+    //         // let subkey = office.open_subkey(x);
+
+    //         // if let Ok(subkey) = subkey {
+    //         //     if let Ok(x) = subkey.get_value::<String, _>("DisplayName") {
+    //         //         offices.push(x);
+    //         //     }
+    //         // }
+    //         println!("{}", match num {
+    //             11 => "Too old!".into(),
+    //             12 => "2007".into(),
+    //             14 => "2010".into(),
+    //             15 => "2013".into(),
+    //             16 => {
+    //                 match office.open_subkey([x.as_str(), "\\Common\\Licensing\\LicensingNext"].concat()) {
+    //                     Ok(x) if x.enum_values().any(|x| x.is_ok_and(|x| x.0.contains("o365"))) => "O365".into(),
+    //                     Ok(_) => "2019".into(),
+    //                     Err(_) => "2016".into(),
+    //                 }
+    //             }
+    //             _ => {
+    //                 ""
+    //             }
+    //         });
+    //     }
+    // });
     
     let mut msoffice = Vec::new();
-    office.enum_keys().for_each(|x| {
-        let x = x.unwrap();
-        if let Ok(num) = x.parse::<f32>() {
-            let num = num as u8;
-            // let subkey = office.open_subkey(x);
 
-            // if let Ok(subkey) = subkey {
-            //     if let Ok(x) = subkey.get_value::<String, _>("DisplayName") {
-            //         offices.push(x);
-            //     }
-            // }
-            msoffice.push(match num {
-                11 => "Too old!".into(),
-                12 => "2007".into(),
-                14 => "2010".into(),
-                15 => "2013".into(),
-                16 => {
-                    match office.open_subkey([x.as_str(), "\\Common\\Licensing\\LicensingNext"].concat()) {
-                        Ok(x) if x.enum_values().any(|x| x.is_ok_and(|x| x.0.contains("o365"))) => "O365".into(),
-                        Ok(_) => "2019".into(),
-                        Err(_) => "2016".into(),
+    for REGKEY in [REGKEY1, REGKEY2] {
+        
+        let office = RegKey::predef(HKEY_LOCAL_MACHINE)
+            .open_subkey(REGKEY);
+        
+        if let Ok(office) = office {
+            let mut msoffice_sel = Vec::new();
+            office.enum_keys().for_each(|x| {
+                let subkey = office.open_subkey(x.unwrap());
+
+                if let Ok(subkey) = subkey {
+                    if let Ok(name) = subkey.get_value::<String, _>("DisplayName") {
+                        if name.contains("Microsoft") && (name.contains("Office") || name.contains("365") ){
+                            msoffice_sel.push(name);
+                   
+                        }
+                
                     }
                 }
-                _ => {
-                    Text::new(format!("Not Sure what office it (num : {}), please tell me : ", num).as_str()).prompt().unwrap_or_default()
-                }
+        
             });
+            if msoffice_sel.len() > 0 {
+                match MultiSelect::new("Found following ms offices: ", msoffice_sel) 
+                    .prompt() {
+                    Ok(res) => res.iter().for_each(|x| msoffice.push(x.into())),
+                    _ => {},
+            
+                }
+            
+            }
         }
-    });
+    }
     
     loop {
-        let ans = Confirm::new("Add missing ms office?")
-            .with_default(false)
-            .prompt().is_ok_and(|x| x);
+        
+        let years = vec![0, 2004, 2007, 2008, 2010, 2011, 2013, 2016, 2019, 2021, 365];
+        let t_editions = vec!["Standard", "Professional", "Professional Plus", "Home & Student", "Home & Business"];
+        let o365_editions = vec!["ProPlus", "University", "Home", "Personal", "Small Business Premium", "Enterprise"];
+        let year_sel = Select::new("Any Microsoft Office to add? ", years)
+            .with_formatter(&|lo| if *lo.value != 0 {
+                (*lo.value).to_string()
+            } else { "None".to_owned() })
+            .raw_prompt();
 
-        if ans {
-            msoffice.push(Text::new("Not Sure what office it, please tell me : ").prompt().unwrap_or_default());
-        } else {
-            break;
+        match year_sel {
+            Ok(year) if year.value != 0 => {
+                let edition_sel = Select::new("Editions", if year.value == 365 {o365_editions} else {t_editions})
+                    .prompt();
+                match edition_sel {
+                    Ok(edition) => {
+                        msoffice.push(format!("{} {}", edition, year));
+                    }
+                    _ => {
+                        continue;
+                    }
+                };
+                
+            }
+            _ => {break;}
         }
     }
 
@@ -638,13 +693,23 @@ async fn get_printers(accessories: &mut Vec<Accessories>) {
         .with_default(false)
         .prompt().is_ok_and(|x| x);
 
+    let mut printers = Vec::new();
     if ans {
         if let Ok(res) = wmi_con.async_query::<Win32_Printer>().await {
             res.into_iter().for_each(|x| {
-                if x.Attributes & 64 != 0 && Confirm::new(format!("Add {}?", x.Name).as_str()).with_default(false).prompt_skippable().is_ok_and(|x| x.is_some_and(|x| x)){
-                    accessories.push(Accessories { item: Item::Printer, details: Details { count: 1, remarks: Some(x.Name)  }  });
-                }});
-        }    }
+                printers.push(x.Name.to_owned());
+            });
+        }   
+    }
+
+    
+    match MultiSelect::new("Found following ms offices: ", printers) 
+    .prompt() {
+        Ok(res) => res.iter().for_each(|x|
+                    accessories.push(Accessories { item: Item::Printer, details: Details { count: 1, remarks: Some(x.to_owned())  }})),
+        _ => {},
+        
+    }
 }
 
 // #[async_std::main]
@@ -663,11 +728,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("Info is as follows:\n {:#?}", &infoc);
 
-    let ans = Confirm::new("Do you wish to submit now?")
-        .with_default(true)
-        .prompt()?;
+    // let ans = Confirm::new("Do you wish to submit now?")
+    //     .with_default(true)
+    //     .prompt()?;
 
-    if ans {
+    // if ans {
         let encinfo = rkyv::to_bytes::<_, 63356>(&infoc).expect("Unable to serialize info").to_vec();
         
         let packet = Packet {
@@ -676,44 +741,49 @@ async fn main() -> Result<(), Box<dyn Error>> {
             staffid : staffid.to_owned(),
             encinfo,
         };
-        for cstr in CONNECTION_STR_CLIENT {
-            if let Ok(stream) = TcpStream::connect(cstr).await {
-                println!("Connected to server at {}", cstr);
-                // let mut writer = RkyvWriter::<_, VarintLength>::new(stream.clone());
-
-                // writer.send(&packet).await.expect("Unable to send packet to server");
-
-                // let mut buffer = AlignedVec::new();
-                
-                // let data : &Archived<Packet> = archive_stream::<_, Packet, VarintLength>(&mut stream, &mut buffer).await.unwrap();
-                // dbg!(data);
-
-                let encpacket = rkyv::to_bytes::<_, 65536>(&packet).expect("Unable to serialize packet");
-                let mut stream = Framed::new(stream, LengthDelimitedCodec::new());
-                
-                println!("Submitting");
-
-                stream.send(Bytes::from(encpacket.into_vec())).await?;
-
-                let response = stream.next().await.unwrap().expect("Unable to receive response from server");
-                if response == Bytes::from("OK") {
-                    println!("Uploaded successfully");
-                } else {
-                    println!("Server error : {:?}", response);
-                }
-                
-                let _ = Text::new("Quit now?").prompt()?;
-                return Ok(());
-            }
-        }
-        if Confirm::new("Looks like we haven't been able to connect to server, save offline?").with_default(true).prompt().is_ok_and(|x| x) {
+        match Confirm::new("Save remotely? (y for online, n for offline)").with_default(true).prompt() {
             
+            Ok(true) => {
+              for cstr in CONNECTION_STR_CLIENT {
+                if let Ok(stream) = TcpStream::connect(cstr).await {
+                    println!("Connected to server at {}", cstr);
+                    // let mut writer = RkyvWriter::<_, VarintLength>::new(stream.clone());
+
+                    // writer.send(&packet).await.expect("Unable to send packet to server");
+
+                    // let mut buffer = AlignedVec::new();
+                
+                    // let data : &Archived<Packet> = archive_stream::<_, Packet, VarintLength>(&mut stream, &mut buffer).await.unwrap();
+                    // dbg!(data);
+
+                    let encpacket = rkyv::to_bytes::<_, 65536>(&packet).expect("Unable to serialize packet");
+                    let mut stream = Framed::new(stream, LengthDelimitedCodec::new());
+                
+                    println!("Submitting");
+
+                    stream.send(Bytes::from(encpacket.into_vec())).await?;
+
+                    let response = stream.next().await.unwrap().expect("Unable to receive response from server");
+                    if response == Bytes::from("OK") {
+                        println!("Uploaded successfully");
+                    } else {
+                        println!("Server error : {:?}", response);
+                    }
+                
+                    let _ = Text::new("Quit now?").prompt()?;
+                    return Ok(());
+                }       
+    }
+
+            }           
+            Ok(false) => 
+{
             let db = block_on(HashStore::open(DB_NAME_TEMP)).expect("Unable to open db");
 
             println!("Saving data to disk");
 
             let cmds = vec![
-                CommandData::remove(packet.staffid.clone().into_bytes()),
+                // CommandData::remove(packet.staffid.clone().into_bytes()),
                 CommandData::set(
                     packet.staffid.clone().into_bytes(),
                     packet.encinfo.into(),
@@ -721,8 +791,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             ];
             block_on(db.batch(cmds)).expect("Unable to put to database");
             block_on(db.flush()).expect("Unable to flush to database");
-        }
-    }
+        
+        }            
+        _ => {}
+        }        
+
+    // }
 
 
     Ok(())
